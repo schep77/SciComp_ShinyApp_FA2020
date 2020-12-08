@@ -1,0 +1,246 @@
+---
+title: "Shiny Root Find"
+output: html_notebook
+---
+```{r libraries}
+library(shiny)
+library(tidyverse)
+library(shinydashboard)
+```
+
+```{r root-methods}
+fixedpoint <- function (ftn, x0, tol = 1e-09, max.iter = 100) 
+{
+  xold <- x0
+  xnew <- ftn(xold)
+  iter <- 1
+  cat("At iteration 1 value of x is:", xnew, "\n")
+  while ((abs(xnew - xold) > tol) && (iter < max.iter)) {
+    xold <- xnew
+    xnew <- ftn(xold)
+    iter <- iter + 1
+    cat("At iteration", iter, "value of x is:", xnew, "\n")
+  }
+  if (abs(xnew - xold) > tol) {
+    cat("Algorithm failed to converge\n")
+    return(NULL)
+  }
+  else {
+    cat("Algorithm converged\n")
+    return(xnew)
+  }
+}
+bisection <- function(ftn, x.l, x.r, tol = 1e-9) {
+  # applies the bisection algorithm to find x such that ftn(x) == 0
+  # we assume that ftn is a function of a single variable
+  #
+  # x.l and x.r must bracket the fixed point, that is
+  # x.l < x.r and ftn(x.l) * ftn(x.r) < 0
+  #
+  # the algorithm iteratively refines x.l and x.r and terminates when
+  # x.r - x.l <= tol
+
+  # check inputs
+  if (x.l >= x.r) {
+    cat("error: x.l >= x.r \n")
+    return(NULL)
+  } 
+  f.l <- ftn(x.l)
+  f.r <- ftn(x.r)
+  if (f.l == 0) {
+    return(x.l)
+  } else if (f.r == 0) {
+    return(x.r)
+  } else if (f.l * f.r > 0) {
+    cat("error: ftn(x.l) * ftn(x.r) > 0 \n")
+    return(NULL)
+  }
+
+  # successively refine x.l and x.r
+  n <- 0
+  while ((x.r - x.l) > tol) {
+    x.m <- (x.l + x.r)/2
+    f.m <- ftn(x.m)
+    if (f.m == 0) {
+      return(x.m)
+    } else if (f.l * f.m < 0) {
+      x.r <- x.m
+      f.r <- f.m
+    } else {
+      x.l <- x.m
+      f.l <- f.m
+    }
+    n <- n + 1
+    cat("at iteration", n, "the root lies between", x.l, "and", x.r, "\n")
+  }
+
+  # return (approximate) root
+  return((x.l + x.r)/2)
+}
+newtonraphson <- function(ftn, x0, tol = 1e-9, max.iter = 100) {
+  # Newton_Raphson algorithm for solving ftn(x)[1] == 0
+  # we assume that ftn is a function of a single variable that returns
+  # the function value and the first derivative as a vector of length 2
+  #
+  # x0 is the initial guess at the root
+  # the algorithm terminates when the function value is within distance
+  # tol of 0, or the number of iterations exceeds max.iter
+
+  # initialise
+  x <- x0
+  fx <- ftn(x)
+  iter <-  0
+
+  # continue iterating until stopping conditions are met
+  while ((abs(fx[1]) > tol) && (iter < max.iter)) {
+    x <- x - fx[1]/fx[2]
+    fx <- ftn(x)
+    iter <- iter + 1
+    cat("At iteration", iter, "value of x is:", x, "\n")
+  }
+
+  # output depends on success of algorithm
+  if (abs(fx[1]) > tol) {
+    cat("Algorithm failed to converge\n")
+    return(NULL)
+  } else {
+    cat("Algorithm converged\n")
+    return(x)
+  }
+}
+
+```
+
+```{r main}
+#header message
+header <- dashboardHeader(title = "Root Finding Methods")
+#layout of the dashoboard
+body <- dashboardBody(
+  fluidRow(
+    column(width = 9, height = 5,
+      box(width = NULL, solidHeader = TRUE,
+        plotOutput(outputId = "funcPlotOutput")
+      ),
+      box(width = NULL,
+        htmlOutput(outputId = "funcOutput"),
+      )
+    ),
+    column(width = 3,
+      box(width = NULL, status = "warning",
+        textInput(inputId = "funcInput", label = "Please insert a function", value = 0),
+        numericInput(inputId = "x0_val", label = "What is x0?", value = 1),
+        numericInput(inputId = "x1_val", label = "What is x1? (if using bisection)", value = 2),
+      ),
+      box(width = NULL, status = "warning",
+        radioButtons(inputId = "rootMethod", label = "Which Root Finding Method?", choiceNames = list("Fixed Point", "Bisection", "Newtons"), choiceValues = list(1, 2, 3)),
+        sliderInput(inputId = "graphSlider", label = "Increase/decrease the zoom of the graph around origin", min = 1, max = 10, value = 3),
+        numericInput(inputId = "marker", label = "Place a vertical line", value = 0)
+      )
+    )
+  )
+  
+)
+#make the header purple and disable the side bar
+ui <- dashboardPage(
+  skin = "purple",
+  header,
+  dashboardSidebar(disable = TRUE),
+  body,
+  htmlOutput("text")
+)
+
+server <- function(input, output) {
+  #rendering the graph
+  output$funcPlotOutput <- renderPlot({
+      #receiving the input values
+      f_in <- input$funcInput
+      x_0 <- input$x0_val
+      x_1 <- input$x1_val
+      #parsing the given function from text to expression and getting the derivative of said expression
+      d <- D(parse(text = f_in), "x")
+      #getting values for the graph render
+      slide <- input$graphSlider
+      marker <- input$marker
+      #parsing the function from text to expression in a function
+      f <- function(x){
+        eval(parse(text = f_in))
+      }
+      
+      #f(x) and f'(x) for newton rhapson
+      fx_dfx <- function(x){
+        fx <- eval(parse(text = f_in))
+        dfx <- eval(d)
+        return(c(fx,dfx))
+      }
+      #determine which function to use based upon the chosen function
+      if(input$rootMethod == 1){
+        root <- fixedpoint(f,x_0)
+      }
+      if(input$rootMethod == 2){
+        root <- bisection(f,x_0,x_1)
+      }
+      if(input$rootMethod == 3){
+        root <- newtonraphson(fx_dfx,x_0)
+      }
+    
+    
+    
+    
+    #rendering the graph based upon the given function and placing a line on the x
+    p <- ggplot(data = data.frame(x = 0), mapping = aes(x = x))
+    p + stat_function(fun = f) + xlim(-(slide),slide) + geom_hline(yintercept=0, linetype="dashed") + geom_vline(xintercept=0, linetype="dashed") + geom_vline(xintercept=root, linetype="dashed", color="red") + geom_vline(xintercept=marker, linetype="dashed")
+  })
+  
+  output$funcOutput <- renderText({
+      
+      #receiving the input values
+      f_in <- input$funcInput
+      x_0 <- input$x0_val
+      x_1 <- input$x1_val
+      #parsing the given function from text to expression and getting the derivative of said expression
+      d <- D(parse(text = f_in), "x")
+      
+      #parsing the function from text to expression in a function
+      f <- function(x){
+        eval(parse(text = f_in))
+      }
+      
+      #f(x) and f'(x) for newton rhapson
+      fx_dfx <- function(x){
+        fx <- eval(parse(text = f_in))
+        dfx <- eval(d)
+        return(c(fx,dfx))
+      }
+      #determine which function to use based upon the chosen function
+      if(input$rootMethod == 1){
+        root <- fixedpoint(f,x_0)
+      }
+      if(input$rootMethod == 2){
+        root <- bisection(f,x_0,x_1)
+      }
+      if(input$rootMethod == 3){
+        root <- newtonraphson(fx_dfx,x_0)
+      }
+      #make sure the given x values are good
+      if(input$rootMethod == 2 && (x_0 == x_1 || x_1 < x_0)){
+        paste("<center> <h2> <b> Please make sure that x0 is less than x1 <b> <h2> <center>")
+      }
+      #make sure the root lies in the given bisection
+      else if(input$rootMethod == 2 && (f(x_0) * f(x_1) > 0)){
+        paste("<center> <h2> <b> Please refer to the graph and make sure the root lies in between x0 and x1 <b> <h2> <center>")
+      }
+      #if there is no found root return an error
+      else if(is.null(root)){
+        paste("<center> <h2> <b> The Root Finding Method Failed <b> <h2> <center>")
+      }
+      else{
+        paste("<center> <h2> <b> The root is ", root,"<b> <h2> <center>")
+      }
+      
+  })  
+}
+
+shinyApp(ui, server)
+```
+
+

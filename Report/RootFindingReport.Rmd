@@ -1,0 +1,155 @@
+---
+title: "Shiny App - Root Finding Report"
+author: "Kaitlyn Scheppa, Tyler Simpson, and Orel Yoshia"
+output: 
+  html_notebook:
+    toc: True
+    toc_float: True
+    toc_depth: 2
+    number_sections: True
+    theme: united
+---
+  
+# Introduction
+  
+  The goal of our project is to explore how to make a Shiny App. We created an app that illustrated different root-finding methods that we were taught throughout the semester. In our Shiny App, the user enters a one-dimensional function for which the root is requested. The user can then also control the initial points of that function. After the function is entered, the user is able to see the root of that function depending on which method was used. If there is an error with the initial points or the function itself, a message would be displayed as well.
+Our motivation was to learn something new by creating the shiny app, while also putting into practice the things we were learning in class. Hopefully we can visualize the concept of root finding through our development and testing of this app.
+
+# Methods
+
+- The root finding methods that we used include:
+  - Fixed point method
+  - Bisection method
+  - Newton Raphson method. 
+- To learn how to build a shiny app we used:
+  - Google
+  - R documentation
+  - Resources provided by you
+- Overall, we used this project to focus on learning how to create shiny apps in R, this was our main challenge and our greatest achievement.
+
+# Conclusion
+
+In conclusion, we used this project as a way to learn a different side of R. In class we only really focused on creating R notebooks, and not any other outputs so that is why we wanted to focus on the shiny app for this project. During implementation we struggled with the shiny app, we were having issues with converting the inputted function string to an expression. To figure this out, we stared at a lot of R documentation, and asked stack overflow a lot of questions to eventually figure out how to use `eval(parse(text = f_in))` to solve this problem.
+
+This project perfectly supplemented our in class lectures of root finding. If we had more time and a deeper understanding of shiny apps, we would have:
+  
+  - Resarched more root finding methods to implement (ex. Secant, Steffensen's Method, False Position Method)
+  - Figured out how to export data
+  - Found out how to save and display previous roots
+  - Implemented more dynamic graphs 
+  - Made a pre-selected set of functions for ease of use.
+
+
+# Appendix 
+
+## Fixed Point Method
+```{r}
+fixedpoint <- function (ftn, x0, tol = 1e-09, max.iter = 100) 
+{
+  xold <- x0
+  xnew <- ftn(xold)
+  iter <- 1
+  cat("At iteration 1 value of x is:", xnew, "\n")
+  while ((abs(xnew - xold) > tol) && (iter < max.iter)) {
+    xold <- xnew
+    xnew <- ftn(xold)
+    iter <- iter + 1
+    cat("At iteration", iter, "value of x is:", xnew, "\n")
+  }
+  if (abs(xnew - xold) > tol) {
+    cat("Algorithm failed to converge\n")
+    return(NULL)
+  }
+  else {
+    cat("Algorithm converged\n")
+    return(xnew)
+  }
+}
+```
+
+## Bisection Method
+```{r}
+bisection <- function(ftn, x.l, x.r, tol = 1e-9) {
+  # applies the bisection algorithm to find x such that ftn(x) == 0
+  # we assume that ftn is a function of a single variable
+  #
+  # x.l and x.r must bracket the fixed point, that is
+  # x.l < x.r and ftn(x.l) * ftn(x.r) < 0
+  #
+  # the algorithm iteratively refines x.l and x.r and terminates when
+  # x.r - x.l <= tol
+
+  # check inputs
+  if (x.l >= x.r) {
+    cat("error: x.l >= x.r \n")
+    return(NULL)
+  } 
+  f.l <- ftn(x.l)
+  f.r <- ftn(x.r)
+  if (f.l == 0) {
+    return(x.l)
+  } else if (f.r == 0) {
+    return(x.r)
+  } else if (f.l * f.r > 0) {
+    cat("error: ftn(x.l) * ftn(x.r) > 0 \n")
+    return(NULL)
+  }
+
+  # successively refine x.l and x.r
+  n <- 0
+  while ((x.r - x.l) > tol) {
+    x.m <- (x.l + x.r)/2
+    f.m <- ftn(x.m)
+    if (f.m == 0) {
+      return(x.m)
+    } else if (f.l * f.m < 0) {
+      x.r <- x.m
+      f.r <- f.m
+    } else {
+      x.l <- x.m
+      f.l <- f.m
+    }
+    n <- n + 1
+    cat("at iteration", n, "the root lies between", x.l, "and", x.r, "\n")
+  }
+
+  # return (approximate) root
+  return((x.l + x.r)/2)
+}
+```
+
+
+## Newton-Raphson Method
+```{r}
+newtonraphson <- function(ftn, x0, tol = 1e-9, max.iter = 100) {
+  # Newton_Raphson algorithm for solving ftn(x)[1] == 0
+  # we assume that ftn is a function of a single variable that returns
+  # the function value and the first derivative as a vector of length 2
+  #
+  # x0 is the initial guess at the root
+  # the algorithm terminates when the function value is within distance
+  # tol of 0, or the number of iterations exceeds max.iter
+
+  # initialize
+  x <- x0
+  fx <- ftn(x)
+  iter <-  0
+
+  # continue iterating until stopping conditions are met
+  while ((abs(fx[1]) > tol) && (iter < max.iter)) {
+    x <- x - fx[1]/fx[2]
+    fx <- ftn(x)
+    iter <- iter + 1
+    cat("At iteration", iter, "value of x is:", x, "\n")
+  }
+
+  # output depends on success of algorithm
+  if (abs(fx[1]) > tol) {
+    cat("Algorithm failed to converge\n")
+    return(NULL)
+  } else {
+    cat("Algorithm converged\n")
+    return(x)
+  }
+}
+```
